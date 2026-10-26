@@ -6,7 +6,6 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const crypto = require('crypto');
 
 const args = Object.fromEntries(process.argv.slice(2).map(a => {
   const m = a.match(/^--([^=]+)(?:=(.*))?$/);
@@ -64,33 +63,25 @@ function addresses() {
 const clean = (s, max) => String(s == null ? '' : s)
   .replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
 
-// ---------- admin key (needed to clear the wall) ----------
-// Set your own with the ADMIN_KEY environment variable (or --key=...). Otherwise a random one is printed at startup.
-const KEY_FROM_ENV = Boolean(args.key || process.env.ADMIN_KEY);
-const ADMIN_KEY = String(args.key || process.env.ADMIN_KEY || crypto.randomBytes(5).toString('hex'));
-let badTries = 0, lockUntil = 0;
-function keyOk(k) {
-  const a = Buffer.from(String(k == null ? '' : k)), b = Buffer.from(ADMIN_KEY);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
+// ---------- admin page: clear the wall from any device (no key needed) ----------
 const ADMIN_HTML = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Diya Wall admin</title><style>
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;background:#021815;color:#F9BD20;font-family:'Segoe UI',Helvetica,Arial,sans-serif}
 main{width:min(100%,380px);text-align:center}h1{font-size:1.5rem}p{color:#d6f3ef}
-input{width:100%;padding:14px;border-radius:12px;border:1px solid #ffffff44;background:#ffffff14;color:#fff;font-size:16px;margin:8px 0}
 button{width:100%;padding:15px;border:0;border-radius:12px;font-size:1.05rem;font-weight:700;background:#d93025;color:#fff;margin-top:6px}
-#msg{min-height:1.4em;margin-top:12px;color:#8fe3da}</style></head><body><main>
+button:disabled{opacity:.6}#msg{min-height:1.4em;margin-top:12px;color:#8fe3da}</style></head><body><main>
 <h1>Diya Wall admin</h1><p id="count">&nbsp;</p>
-<input id="k" type="password" placeholder="Admin key" autocomplete="off">
 <button id="b">Clear all diyas</button><div id="msg"></div></main><script>
 const $=i=>document.getElementById(i);
 async function count(){try{const t=await (await fetch('/health')).text();$('count').textContent=t.replace('ok ','')+' diyas on the wall'}catch(e){}}
 count();
-$('b').onclick=async()=>{const key=$('k').value.trim();if(!key){$('msg').textContent='Enter the admin key';return}
+$('b').onclick=async()=>{
  if(!confirm('Clear ALL diyas from the wall?'))return;
- try{const r=await fetch('/admin/clear',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});
-  $('msg').textContent=r.ok?'Cleared. The wall is empty.':(r.status===429?'Too many tries, wait a minute.':'Wrong key.');count()}
- catch(e){$('msg').textContent='Could not reach the server.'}};
+ $('b').disabled=true;
+ try{const r=await fetch('/admin/clear',{method:'POST'});
+  $('msg').textContent=r.ok?'Cleared. The wall is empty.':'Could not clear. Try again.';count()}
+ catch(e){$('msg').textContent='Could not reach the server.'}
+ $('b').disabled=false};
 </script></body></html>`;
 
 function send(res, code, type, body) {
@@ -154,23 +145,10 @@ const server = http.createServer((req, res) => {
     if (url === '/admin' && req.method === 'GET') return send(res, 200, 'text/html; charset=utf-8', ADMIN_HTML);
 
     if (url === '/admin/clear' && req.method === 'POST') {
-      let body = '';
-      req.on('data', d => { body += d; if (body.length > 1000) req.destroy(); });
-      req.on('end', () => {
-        const now = Date.now();
-        if (now < lockUntil) return send(res, 429, 'text/plain', 'too many tries');
-        let key = '';
-        try { key = JSON.parse(body).key; } catch (e) { /* treated as wrong key */ }
-        if (!keyOk(key)) {
-          if (++badTries >= 8) { lockUntil = now + 60000; badTries = 0; }
-          return send(res, 403, 'text/plain', 'wrong key');
-        }
-        badTries = 0;
-        wishes = []; seq = 0; epoch = Date.now(); recent.clear(); save();
-        broadcast({ init: [], epoch });
-        send(res, 200, 'text/plain', 'cleared');
-      });
-      return;
+      req.resume();
+      wishes = []; seq = 0; epoch = Date.now(); recent.clear(); save();
+      broadcast({ init: [], epoch });
+      return send(res, 200, 'text/plain', 'cleared');
     }
 
     if (url === '/info') {
@@ -217,5 +195,5 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log('   or restart with  node server.js --ip=<your Wi-Fi address>');
   }
   console.log('\n   On the wall:  T = add a test diya   N = next address   Shift+R = clear all   F = fullscreen');
-  console.log(`   Clear from any device: open /admin  (key: ${KEY_FROM_ENV ? 'the ADMIN_KEY you set' : ADMIN_KEY})\n`);
+  console.log('   Clear from any device: open /admin\n');
 });

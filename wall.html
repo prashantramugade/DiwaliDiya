@@ -102,7 +102,6 @@
     <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></div>
     <h2 id="mtitle">Clear the wall?</h2>
     <p id="mcount">All diyas will be removed for everyone.</p>
-    <input id="mkey" type="password" placeholder="Admin key" autocomplete="off" autocapitalize="off" spellcheck="false">
     <div id="mmsg" role="alert"></div>
     <div class="row"><button id="mcancel" class="cancel" type="button">Cancel</button><button id="mgo" class="go" type="button">Clear all diyas</button></div>
   </div>
@@ -448,32 +447,28 @@ setInterval(() => { if (Date.now() - lastMsg > 35000) { lastMsg = Date.now(); co
 const NAMES = ['Asha', 'Rahul', 'Priya', 'Vikram', 'Meera', 'Jan', 'Sanne', 'Arjun', 'Lotte', 'Kiran'];
 const WISHES = ['Health and happiness', 'Fewer flaky tests', 'Peace and light', 'A bug-free release', 'Good food, good friends', ''];
 const pick = a => a[Math.floor(Math.random() * a.length)];
-// ---------- clear wall (needs the admin key, the same one the /admin page uses) ----------
-const modal = $('modal'), mkey = $('mkey'), mmsg = $('mmsg'), mgo = $('mgo');
+// ---------- clear wall (button top right, or Shift+R) ----------
+const modal = $('modal'), mmsg = $('mmsg'), mgo = $('mgo');
 function openClear() {
-  let k = ''; try { k = sessionStorage.getItem('dk') || ''; } catch (e) { /* ignore */ }
-  mkey.value = k; mmsg.textContent = ''; mgo.disabled = false; mgo.textContent = 'Clear all diyas';
+  mmsg.textContent = ''; mgo.disabled = false; mgo.textContent = 'Clear all diyas';
   $('mcount').textContent = total === 0 ? 'The wall is already empty.' : 'All ' + total + (total === 1 ? ' diya' : ' diyas') + ' will be removed for everyone.';
-  modal.classList.add('open'); setTimeout(() => mkey.focus(), 30);
+  modal.classList.add('open'); setTimeout(() => $('mcancel').focus(), 30); // Cancel is focused so a stray Enter cannot clear the wall
 }
-function closeClear() { modal.classList.remove('open'); mkey.value = ''; mkey.blur(); }
+function closeClear() { modal.classList.remove('open'); }
 async function doClear() {
-  const k = mkey.value.trim(); if (!k) { mmsg.textContent = 'Enter the admin key.'; mkey.focus(); return; }
   mgo.disabled = true; mgo.textContent = 'Clearing…'; mmsg.textContent = '';
-  const r = await fetch('/admin/clear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: k }) }).catch(() => null);
-  if (r && r.ok) { try { sessionStorage.setItem('dk', k); } catch (e) { /* ignore */ } closeClear(); return; }
-  try { sessionStorage.removeItem('dk'); } catch (e) { /* ignore */ }
-  mmsg.textContent = !r ? 'Could not reach the server.' : r.status === 429 ? 'Too many tries. Wait a minute.' : 'Wrong admin key.';
-  mgo.disabled = false; mgo.textContent = 'Clear all diyas'; mkey.select();
+  const r = await fetch('/admin/clear', { method: 'POST' }).catch(() => null);
+  if (r && r.ok) { closeClear(); return; }
+  mmsg.textContent = r ? 'Could not clear. Please try again.' : 'Could not reach the server.';
+  mgo.disabled = false; mgo.textContent = 'Clear all diyas';
 }
 $('adminBtn').addEventListener('click', openClear);
 $('mcancel').addEventListener('click', closeClear);
 mgo.addEventListener('click', doClear);
 modal.addEventListener('click', e => { if (e.target === modal) closeClear(); });
-mkey.addEventListener('keydown', e => { if (e.key === 'Enter') doClear(); });
 function toggleFs() { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}); }
 addEventListener('keydown', e => {
-  if (modal.classList.contains('open')) { if (e.key === 'Escape') closeClear(); return; } // typing the key must not trigger shortcuts
+  if (modal.classList.contains('open')) { if (e.key === 'Escape') closeClear(); return; } // no shortcuts while the card is open
   const k = e.key.toLowerCase();
   if (k === 'f') toggleFs();
   else if (k === 't') fetch('/wish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: pick(NAMES), text: pick(WISHES) }) }).catch(() => {});
