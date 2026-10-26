@@ -1,0 +1,10 @@
+{
+  "name": "diya-wall",
+  "version": "1.0.0",
+  "description": "Live Diwali diya wall: guests scan a QR code and light a diya on the big screen",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "license": "MIT",
+  "private": true
+}

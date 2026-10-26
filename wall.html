@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diya Wall</title>
+<style>
+  /* Branding: teal #009488, yellow #F9BD20 (ABN AMRO). The official ABN AMRO typeface is proprietary, so a clean system sans is used. */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: radial-gradient(circle at 50% 100%, #0c5a53, #021815 74%);
+               font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #F9BD20; }
+  body.nocursor { cursor: none; }
+  #fx { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+  #head { position: fixed; top: 0; left: 0; right: 0; text-align: center; padding-top: 12px; z-index: 5; pointer-events: none; }
+  h1 { margin: 0; font-size: clamp(1.8rem, 4.6vw, 3.8rem); line-height: 1.2; font-weight: 700; color: #F9BD20;
+       text-shadow: 0 0 22px rgba(249,189,32,.55), 0 0 55px rgba(255,120,0,.4); }
+  h1 .brand { color: #fff; background: #009488; padding: .02em .32em; border-radius: .18em; margin-right: .2em; text-shadow: none; letter-spacing: .02em; }
+  #count { color: #8fe3da; font-size: clamp(1rem, 1.9vw, 1.5rem); margin-top: 4px; }
+  #latest { height: 2.7em; margin: 8px auto 0; max-width: 80vw; font-size: clamp(1rem, 2vw, 1.7rem); line-height: 1.3;
+            color: #fff; overflow: hidden; opacity: 0; transition: opacity .6s; }
+
+  #qrbox { position: fixed; z-index: 6; background: #fff; color: #06312d; border-radius: 18px; padding: 16px; box-sizing: border-box;
+           text-align: center; box-shadow: 0 0 0 6px #009488, 0 0 60px rgba(249,189,32,.55);
+           transition: left .9s ease, top .9s ease, width .9s ease; }
+  #qrbox.problem { box-shadow: 0 0 0 6px #d93025, 0 0 60px rgba(217,48,37,.6); }
+  #qrbox.problem canvas { display: none; }
+  #qrbox .t { color: #007a70; }
+  #qrbox canvas { width: 100%; aspect-ratio: 1; height: auto; display: block; image-rendering: pixelated; }
+  #qrbox .t { font-weight: 700; margin-bottom: 8px; font-size: var(--qt, 18px); }
+  #qrbox .u { margin-top: 8px; font-weight: 600; word-break: break-all; font-size: var(--qu, 16px); }
+  #qrbox .s { opacity: .7; margin-top: 4px; font-size: var(--qs, 13px); }
+
+  .diya { position: absolute; width: 110px; height: 90px; z-index: 2; transition: left .8s ease, top .8s ease, opacity 1s ease; }
+  .sc { width: 110px; transform-origin: 0 0; transform: scale(var(--s, 1)); transition: transform .8s ease; }
+  .ig.new { animation: ignite 1.1s ease-out .6s backwards; }
+  .flame { width: 16px; height: 32px; margin: 0 auto -6px; border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%;
+           background: radial-gradient(ellipse at 50% 80%, #fff6b0, #ffb000 55%, #ff4d00);
+           box-shadow: 0 0 22px 10px rgba(255,150,0,.55); animation: flick .18s infinite alternate; transform-origin: 50% 100%; }
+  .bowl { width: 64px; height: 24px; margin: 0 auto; background: linear-gradient(#e8933a, #7a3a10); border-radius: 0 0 64px 64px / 0 0 40px 40px; }
+  .name { margin: 5px -12px 0; font-size: 17px; font-weight: 600; text-align: center; color: #F9BD20; text-shadow: 0 0 8px #000;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @keyframes flick { 0% { transform: scale(1, 1) rotate(-3deg); } 100% { transform: scale(.88, 1.12) rotate(3deg); } }
+  @keyframes ignite { 0% { opacity: 0; transform: scale(.3); filter: brightness(3); } 60% { opacity: 1; transform: scale(1.15); } 100% { transform: none; filter: none; } }
+
+  #status { position: fixed; left: 10px; bottom: 8px; z-index: 7; font: 12px system-ui, sans-serif; color: #ffffff88; pointer-events: none; }
+  #status.bad { color: #ff6b6b; font-size: 16px; font-weight: 700; }
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<div id="head">
+  <h1><span class="brand">ABN AMRO</span>Diwali Diya Wall 🪔</h1>
+  <div id="count"></div>
+  <div id="latest"></div>
+</div>
+<div id="qrbox">
+  <div class="t">Scan to light your diya</div>
+  <canvas id="qr"></canvas>
+  <div class="u" id="url"></div>
+  <div class="s">Join the office Wi-Fi first</div>
+</div>
+<div id="wall"></div>
+<div id="status">● connecting…</div>
+
+<script>
+// QR-BEGIN  (self-contained QR code generator: byte mode, error correction M, versions 1-10)
+const QR = (() => {
+  const ECC = [0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26]; // EC codewords per block
+  const BLK = [0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5];           // number of blocks
+  const rawBits = v => { let r = (16 * v + 128) * v + 64; if (v >= 2) { const a = Math.floor(v / 7) + 2; r -= (25 * a - 10) * a - 55; if (v >= 7) r -= 36; } return r; };
+  const dataCw = v => Math.floor(rawBits(v) / 8) - ECC[v] * BLK[v];
+  const gfMul = (x, y) => { let z = 0; for (let i = 7; i >= 0; i--) { z = (z << 1) ^ ((z >>> 7) * 0x11D); z ^= ((y >>> i) & 1) * x; } return z; };
+  const rsDiv = d => { const r = new Array(d).fill(0); r[d - 1] = 1; let root = 1;
+    for (let i = 0; i < d; i++) { for (let j = 0; j < d; j++) { r[j] = gfMul(r[j], root); if (j + 1 < d) r[j] ^= r[j + 1]; } root = gfMul(root, 2); } return r; };
+  const rsRem = (data, div) => { const r = div.map(() => 0);
+    for (const b of data) { const f = b ^ r.shift(); r.push(0); div.forEach((c, i) => { r[i] ^= gfMul(c, f); }); } return r; };
+  const alignPos = v => { if (v === 1) return []; const n = Math.floor(v / 7) + 2, size = v * 4 + 17;
+    const step = Math.ceil((v * 4 + 4) / (n * 2 - 2)) * 2; const r = [6];
+    for (let p = size - 7; r.length < n; p -= step) r.splice(1, 0, p); return r; };
+  const bit = (x, i) => ((x >>> i) & 1) !== 0;
+
+  function make(text) {
+    const bytes = Array.from(new TextEncoder().encode(text));
+    let v = 1;
+    for (; v <= 10; v++) if (4 + (v < 10 ? 8 : 16) + bytes.length * 8 <= dataCw(v) * 8) break;
+    if (v > 10) throw new Error('text too long');
+    const cap = dataCw(v) * 8, bits = [];
+    const put = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1); };
+    put(4, 4); put(bytes.length, v < 10 ? 8 : 16); bytes.forEach(b => put(b, 8));
+    put(0, Math.min(4, cap - bits.length)); put(0, (8 - bits.length % 8) % 8);
+    for (let pad = 0xEC; bits.length < cap; pad ^= 0xEC ^ 0x11) put(pad, 8);
+    const data = [];
+    for (let i = 0; i < bits.length; i += 8) { let b = 0; for (let j = 0; j < 8; j++) b = (b << 1) | bits[i + j]; data.push(b); }
+
+    // error correction + interleave
+    const nb = BLK[v], ecl = ECC[v], raw = Math.floor(rawBits(v) / 8), nShort = nb - raw % nb, shortLen = Math.floor(raw / nb);
+    const div = rsDiv(ecl), blocks = []; let k = 0;
+    for (let i = 0; i < nb; i++) {
+      const dat = data.slice(k, k + shortLen - ecl + (i < nShort ? 0 : 1)); k += dat.length;
+      const ec = rsRem(dat, div); if (i < nShort) dat.push(0); blocks.push(dat.concat(ec));
+    }
+    const cw = [];
+    for (let i = 0; i < blocks[0].length; i++) blocks.forEach((b, j) => { if (i !== shortLen - ecl || j >= nShort) cw.push(b[i]); });
+
+    // matrix
+    const size = v * 4 + 17;
+    const mod = Array.from({ length: size }, () => new Array(size).fill(false));
+    const fn = Array.from({ length: size }, () => new Array(size).fill(false));
+    const setF = (x, y, d) => { mod[y][x] = d; fn[y][x] = true; };
+    for (let i = 0; i < size; i++) { setF(6, i, i % 2 === 0); setF(i, 6, i % 2 === 0); }
+    const finder = (cx, cy) => { for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+      const dist = Math.max(Math.abs(dx), Math.abs(dy)), xx = cx + dx, yy = cy + dy;
+      if (xx >= 0 && xx < size && yy >= 0 && yy < size) setF(xx, yy, dist !== 2 && dist !== 4); } };
+    finder(3, 3); finder(size - 4, 3); finder(3, size - 4);
+    const ap = alignPos(v), na = ap.length;
+    for (let i = 0; i < na; i++) for (let j = 0; j < na; j++) {
+      if ((i === 0 && j === 0) || (i === 0 && j === na - 1) || (i === na - 1 && j === 0)) continue;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) setF(ap[i] + dx, ap[j] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+    }
+    const drawFormat = mask => {
+      const d = (0 << 3) | mask; let rem = d;                       // error correction level M = 0
+      for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+      const f = ((d << 10) | rem) ^ 0x5412;
+      for (let i = 0; i <= 5; i++) setF(8, i, bit(f, i));
+      setF(8, 7, bit(f, 6)); setF(8, 8, bit(f, 7)); setF(7, 8, bit(f, 8));
+      for (let i = 9; i < 15; i++) setF(14 - i, 8, bit(f, i));
+      for (let i = 0; i < 8; i++) setF(size - 1 - i, 8, bit(f, i));
+      for (let i = 8; i < 15; i++) setF(8, size - 15 + i, bit(f, i));
+      setF(8, size - 8, true);
+    };
+    drawFormat(0);
+    if (v >= 7) {
+      let rem = v; for (let i = 0; i < 12; i++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1F25);
+      const vb = (v << 12) | rem;
+      for (let i = 0; i < 18; i++) { const b = bit(vb, i), a = size - 11 + i % 3, c = Math.floor(i / 3); setF(a, c, b); setF(c, a, b); }
+    }
+    // place data bits in the zig-zag order
+    let n = 0;
+    for (let right = size - 1; right >= 1; right -= 2) {
+      if (right === 6) right = 5;
+      for (let vert = 0; vert < size; vert++) for (let j = 0; j < 2; j++) {
+        const x = right - j, upward = ((right + 1) & 2) === 0, y = upward ? size - 1 - vert : vert;
+        if (!fn[y][x] && n < cw.length * 8) { mod[y][x] = bit(cw[n >>> 3], 7 - (n & 7)); n++; }
+      }
+    }
+    const applyMask = m => { for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      if (fn[y][x]) continue; let inv;
+      switch (m) {
+        case 0: inv = (x + y) % 2 === 0; break;
+        case 1: inv = y % 2 === 0; break;
+        case 2: inv = x % 3 === 0; break;
+        case 3: inv = (x + y) % 3 === 0; break;
+        case 4: inv = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0; break;
+        case 5: inv = (x * y) % 2 + (x * y) % 3 === 0; break;
+        case 6: inv = ((x * y) % 2 + (x * y) % 3) % 2 === 0; break;
+        default: inv = ((x + y) % 2 + (x * y) % 3) % 2 === 0;
+      }
+      if (inv) mod[y][x] = !mod[y][x];
+    } };
+    const P1 = [1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0], P2 = [0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1];
+    const penalty = () => {
+      let r = 0, dark = 0;
+      for (let pass = 0; pass < 2; pass++) for (let a = 0; a < size; a++) {
+        let run = 1;
+        for (let b = 1; b < size; b++) {
+          const cur = pass ? mod[b][a] : mod[a][b], prev = pass ? mod[b - 1][a] : mod[a][b - 1];
+          if (cur === prev) { run++; if (run === 5) r += 3; else if (run > 5) r++; } else run = 1;
+        }
+        for (let s = 0; s + 11 <= size; s++) {
+          let m1 = true, m2 = true;
+          for (let q = 0; q < 11; q++) { const val = (pass ? mod[s + q][a] : mod[a][s + q]) ? 1 : 0; if (val !== P1[q]) m1 = false; if (val !== P2[q]) m2 = false; }
+          if (m1 || m2) r += 40;
+        }
+      }
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        if (mod[y][x]) dark++;
+        if (x < size - 1 && y < size - 1 && mod[y][x] === mod[y][x + 1] && mod[y][x] === mod[y + 1][x] && mod[y][x] === mod[y + 1][x + 1]) r += 3;
+      }
+      const total = size * size;
+      return r + (Math.ceil(Math.abs(dark * 20 - total * 10) / total) - 1) * 10;
+    };
+    let best = 0, bestP = Infinity;
+    for (let m = 0; m < 8; m++) { applyMask(m); drawFormat(m); const p = penalty(); if (p < bestP) { bestP = p; best = m; } applyMask(m); }
+    applyMask(best); drawFormat(best);
+    return { size, get: (x, y) => mod[y][x] };
+  }
+  return { make };
+})();
+// QR-END
+
+const $ = id => document.getElementById(id);
+const wall = $('wall'), head = $('head'), latest = $('latest'), countEl = $('count'), box = $('qrbox'), statusEl = $('status');
+const fx = $('fx'), g = fx.getContext('2d');
+let W = 0, H = 0;
+
+// ---------- QR box ----------
+let join = '', cands = [], candIdx = 0, problem = false;
+function drawQr() {
+  const cv = $('qr'); $('url').textContent = join.replace(/^http:\/\//, '').replace(/\/$/, '');
+  try {
+    const q = QR.make(join), scale = 10, quiet = 4, px = (q.size + quiet * 2) * scale;
+    cv.width = cv.height = px;
+    const c = cv.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0, 0, px, px); c.fillStyle = '#000';
+    for (let y = 0; y < q.size; y++) for (let x = 0; x < q.size; x++) if (q.get(x, y)) c.fillRect((x + quiet) * scale, (y + quiet) * scale, scale, scale);
+  } catch (e) { cv.width = cv.height = 1; }
+}
+const SERVED = location.protocol === 'http:' || location.protocol === 'https:';
+function showProblem() { // page was opened as a plain file / by a static server instead of the Diya Wall server
+  box.classList.add('problem');
+  box.querySelector('.t').textContent = 'Not connected to the Diya Wall server';
+  $('url').textContent = 'In a terminal run:  node server.js   then open  http://localhost:3000/wall';
+  box.querySelector('.s').textContent = 'Do not open wall.html directly or with Live Server';
+  try { if (es) es.close(); } catch (e) { /* ignore */ }
+  clearTimeout(badTimer); badTimer = null;
+  statusEl.className = 'bad'; statusEl.textContent = '● server not found';
+  updateQr();
+}
+async function initJoin() {
+  let info = null;
+  if (SERVED) { try { const r = await fetch('/info'); if (r.ok) info = await r.json(); } catch (e) { /* handled below */ } }
+  if (!info || !Array.isArray(info.candidates) || !info.candidates.length) { problem = true; showProblem(); return; }
+  cands = info.candidates;
+  const h = location.hostname;
+  if (h && h !== 'localhost' && h !== '127.0.0.1' && h !== '[::1]' && h !== '::1') { // opened by a real address: it is known to work
+    join = location.origin + '/'; cands = [join, ...cands.filter(c => c !== join)];
+  } else join = cands[0];
+  candIdx = 0; drawQr(); updateQr();
+}
+function nextAddr() { if (cands.length > 1) { candIdx = (candIdx + 1) % cands.length; join = cands[candIdx]; drawQr(); } }
+
+const SIDE = () => Math.round(Math.min(420, Math.max(240, innerWidth * 0.24)));
+function updateQr() {
+  const hh = head.offsetHeight + 10;
+  if (!active.length) { // nobody yet: big QR in the middle
+    const w = Math.round(Math.max(240, Math.min(innerHeight - hh - 125, innerWidth * 0.9, 760)));
+    box.style.width = w + 'px'; box.style.left = Math.round((innerWidth - w) / 2) + 'px'; box.style.top = hh + 'px';
+    box.style.setProperty('--qt', '28px'); box.style.setProperty('--qu', '30px'); box.style.setProperty('--qs', '18px');
+  } else {              // wall has diyas: QR moves to the side
+    const w = SIDE();
+    box.style.width = w + 'px'; box.style.left = (innerWidth - w - 16) + 'px'; box.style.top = hh + 'px';
+    box.style.setProperty('--qt', '18px'); box.style.setProperty('--qu', '16px'); box.style.setProperty('--qs', '13px');
+  }
+}
+
+// ---------- diyas + adaptive layout ----------
+const active = [];   // { el, id, born, placed, cx, cy }
+const SCALES = [2.4, 2, 1.7, 1.45, 1.25, 1.05, .9, .78, .66, .56, .5];
+const DIM_AFTER_MS = 5 * 60e3, DIM_OVER_MS = 25 * 60e3, MIN_OPACITY = .45;
+
+function area() {
+  const x = 24, y = head.offsetHeight + 14, sideW = SIDE() + 16 + 24;
+  return { x, y, w: Math.max(100, innerWidth - x - sideW), h: Math.max(100, innerHeight - y - 24) };
+}
+function geom(sc) {
+  const R = area(), cw = 132 * sc, ch = 112 * sc;
+  return { R, cw, ch, c: Math.max(1, Math.floor(R.w / cw)), r: Math.max(1, Math.floor(R.h / ch)) };
+}
+function fadeOut(el) { el.style.transition = 'opacity 2.5s ease-in'; el.style.opacity = 0; setTimeout(() => el.remove(), 2600); }
+
+function layout() {
+  const minG = geom(SCALES[SCALES.length - 1]);
+  while (active.length > minG.c * minG.r) fadeOut(active.shift().el); // wall completely full: retire the oldest
+  const n = active.length; if (!n) return;
+  let G = minG, s = SCALES[SCALES.length - 1];
+  for (const sc of SCALES) { const t = geom(sc); if (t.c * t.r >= n) { G = t; s = sc; break; } }
+  const rowsUsed = Math.ceil(n / G.c), y0 = G.R.y + Math.max(0, (G.R.h - rowsUsed * G.ch) / 2);
+  active.forEach((a, i) => {
+    const row = Math.floor(i / G.c), col = i % G.c, cnt = Math.min(G.c, n - row * G.c);
+    const x = G.R.x + (G.R.w - cnt * G.cw) / 2 + col * G.cw + (G.cw - 110 * s) / 2, y = y0 + row * G.ch;
+    const el = a.el, sc = el.firstChild;
+    if (!a.placed) { el.style.transition = 'none'; sc.style.transition = 'none'; }
+    el.style.left = x + 'px'; el.style.top = y + 'px'; sc.style.setProperty('--s', s);
+    if (!a.placed) { void el.offsetWidth; el.style.transition = ''; sc.style.transition = ''; a.placed = true; }
+    a.cx = x + 55 * s; a.cy = y + 16 * s;
+  });
+}
+
+let total = 0, hideTimer;
+function updateCount() {
+  countEl.textContent = total === 0 ? 'Scan the QR code and light your diya'
+    : total + (total === 1 ? ' diya lit' : ' diyas lit') + ' · scan to add yours';
+}
+function addDiya(w, fresh) {
+  const el = document.createElement('div'); el.className = 'diya';
+  el.innerHTML = '<div class="sc"><div class="ig"><div class="flame"></div><div class="bowl"></div><div class="name"></div></div></div>';
+  el.querySelector('.name').textContent = w.name;
+  if (fresh) el.querySelector('.ig').classList.add('new');
+  wall.appendChild(el);
+  const a = { el, id: w.id, born: w.t || Date.now(), placed: false, cx: 0, cy: 0 };
+  active.push(a);
+  layout(); updateQr(); updateCount();
+  if (fresh) {
+    rockets.push({ x0: a.cx + (Math.random() - .5) * 60, tx: a.cx, ty: a.cy, t0: performance.now(), dur: 600, px: 0, py: H,
+                   done: () => burst(a.cx, a.cy, 50) });
+    latest.textContent = w.text ? '“' + w.text + '” — ' + w.name : w.name + ' lit a diya 🪔';
+    latest.style.opacity = 1; clearTimeout(hideTimer); hideTimer = setTimeout(() => { latest.style.opacity = 0; }, 8000);
+  }
+}
+setInterval(() => { // slow dimming of old diyas
+  const now = Date.now();
+  for (const a of active) {
+    const age = Math.max(0, now - a.born - DIM_AFTER_MS);
+    a.el.style.opacity = Math.max(MIN_OPACITY, 1 - (1 - MIN_OPACITY) * Math.min(1, age / DIM_OVER_MS));
+  }
+}, 15000);
+
+// ---------- effects ----------
+const parts = [], rockets = [];
+function burst(x, y, n) {
+  if (parts.length > 1800) n = Math.min(n, 12);
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, s = Math.random() * 4.5 + 1;
+    parts.push({ x, y, px: x, py: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1, decay: .012 + Math.random() * .016, hue: 20 + Math.random() * 40 });
+  }
+}
+let lastAmbient = 0;
+function frame(now) {
+  g.clearRect(0, 0, W, H);
+  g.globalCompositeOperation = 'lighter'; g.lineCap = 'round';
+  for (let i = rockets.length - 1; i >= 0; i--) {
+    const r = rockets[i], p = Math.min(1, (now - r.t0) / r.dur), e = 1 - Math.pow(1 - p, 2);
+    const x = r.x0 + (r.tx - r.x0) * e, y = H + (r.ty - H) * e;
+    g.strokeStyle = 'rgba(255,211,107,.9)'; g.lineWidth = 3; g.beginPath(); g.moveTo(r.px || x, r.py); g.lineTo(x, y); g.stroke();
+    r.px = x; r.py = y;
+    if (p >= 1) { rockets.splice(i, 1); try { r.done && r.done(); } catch (e2) { /* ignore */ } }
+  }
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    p.px = p.x; p.py = p.y; p.x += p.vx; p.y += p.vy; p.vx *= .98; p.vy = p.vy * .98 + .05; p.life -= p.decay;
+    if (p.life <= 0) { parts.splice(i, 1); continue; }
+    g.strokeStyle = 'hsla(' + p.hue + ',100%,60%,' + p.life + ')'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(p.px, p.py); g.lineTo(p.x, p.y); g.stroke();
+  }
+  if (now - lastAmbient > 2200) { lastAmbient = now; burst(W * (.1 + Math.random() * .8), H * (.06 + Math.random() * .24), 36); }
+  requestAnimationFrame(frame);
+}
+
+// ---------- live connection ----------
+let es = null, lastMsg = Date.now(), epoch = null, badTimer = null;
+const seen = new Set();
+function setStatus(ok) {
+  if (ok) { clearTimeout(badTimer); badTimer = null; statusEl.className = ''; statusEl.textContent = '● live'; }
+  else if (!badTimer) badTimer = setTimeout(() => { statusEl.className = 'bad'; statusEl.textContent = '● reconnecting…'; }, 2500);
+}
+function handleInit(m) {
+  const list = m.init || [];
+  if (m.epoch !== epoch) { // first connection, server restarted or wall cleared: rebuild
+    wall.innerHTML = ''; active.length = 0; seen.clear(); epoch = m.epoch; total = 0;
+    list.forEach(w => { seen.add(w.id); total++; addDiya(w, false); });
+    layout(); updateQr(); updateCount();
+  } else { // reconnected: only add what we missed
+    const missing = list.filter(w => !seen.has(w.id));
+    missing.forEach(w => { seen.add(w.id); total++; addDiya(w, missing.length <= 3); });
+  }
+}
+function connect() {
+  if (!SERVED || problem) return;
+  try { if (es) es.close(); } catch (e) { /* ignore */ }
+  es = new EventSource('/events');
+  es.onopen = () => setStatus(true);
+  es.onerror = () => setStatus(false);
+  es.onmessage = e => {
+    lastMsg = Date.now(); setStatus(true);
+    let m; try { m = JSON.parse(e.data); } catch (err) { return; }
+    if (m.init) handleInit(m);
+    else if (m.wish && !seen.has(m.wish.id)) { seen.add(m.wish.id); total++; addDiya(m.wish, true); }
+  };
+}
+setInterval(() => { if (Date.now() - lastMsg > 35000) { lastMsg = Date.now(); connect(); } }, 5000); // watchdog
+
+// ---------- keys & housekeeping ----------
+const NAMES = ['Asha', 'Rahul', 'Priya', 'Vikram', 'Meera', 'Jan', 'Sanne', 'Arjun', 'Lotte', 'Kiran'];
+const WISHES = ['Health and happiness', 'Fewer flaky tests', 'Peace and light', 'A bug-free release', 'Good food, good friends', ''];
+const pick = a => a[Math.floor(Math.random() * a.length)];
+function toggleFs() { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}); }
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'f') toggleFs();
+  else if (k === 't') fetch('/wish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: pick(NAMES), text: pick(WISHES) }) }).catch(() => {});
+  else if (k === 'n') nextAddr();
+  else if (e.key === 'R' && e.shiftKey && confirm('Clear all diyas from the wall?')) fetch('/admin/clear', { method: 'POST' }).catch(() => {});
+});
+addEventListener('dblclick', toggleFs);
+let cursorTimer; const hideCursor = () => document.body.classList.add('nocursor');
+addEventListener('mousemove', () => { document.body.classList.remove('nocursor'); clearTimeout(cursorTimer); cursorTimer = setTimeout(hideCursor, 3000); });
+cursorTimer = setTimeout(hideCursor, 5000);
+async function keepAwake() { try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) { /* not available */ } }
+keepAwake(); document.addEventListener('visibilitychange', () => { if (!document.hidden) keepAwake(); });
+function onResize() { W = fx.width = innerWidth; H = fx.height = innerHeight; layout(); updateQr(); }
+addEventListener('resize', onResize);
+
+onResize(); updateCount(); initJoin(); connect(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>

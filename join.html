@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Light a Diya</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; min-height: 100dvh; background: radial-gradient(circle at 50% 0%, #0c5a53, #021815 72%); color: #F9BD20;
+         font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  main { width: min(100%, 420px); text-align: center; }
+  h1 { font-size: 2rem; margin: .2em 0; text-shadow: 0 0 20px rgba(249,189,32,.5); }
+  .brand { display: inline-block; background: #009488; color: #fff; font-weight: 700; padding: .15em .6em; border-radius: .3em; margin-bottom: .4em; letter-spacing: .02em; }
+  p { color: #d6f3ef; opacity: .95; margin: .4em 0 1em; }
+  input, textarea { width: 100%; margin: 8px 0; padding: 14px; border-radius: 12px; border: 1px solid #ffb34766;
+                    background: #ffffff14; color: #fff; font-size: 16px; font-family: inherit; }
+  input::placeholder, textarea::placeholder { color: #ffffff88; }
+  button { width: 100%; padding: 15px; margin-top: 8px; border: 0; border-radius: 12px; font-size: 1.1rem; font-weight: bold;
+           background: linear-gradient(#ffb300, #ff6a00); color: #2a0e00; cursor: pointer; font-family: inherit; }
+  button:disabled { opacity: .6; }
+  .diya { font-size: 4rem; animation: flick .4s infinite alternate; }
+  @keyframes flick { to { transform: scale(1.1) rotate(2deg); filter: drop-shadow(0 0 18px #ff9d00); } }
+  #msg { min-height: 1.4em; margin-top: 10px; color: #ff9b9b; font-size: .95rem; }
+  #done { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <form id="form" autocomplete="off">
+    <div class="brand">ABN AMRO</div>
+    <div class="diya">🪔</div>
+    <h1>Light a Diya</h1>
+    <p>Add your name and, if you like, a wish. Your diya appears on the big screen.</p>
+    <input id="name" placeholder="Your name" maxlength="24" required autocapitalize="words" enterkeyhint="next">
+    <textarea id="text" placeholder="Your wish for the year (optional)" maxlength="120" rows="3"></textarea>
+    <button id="btn" type="submit">Light my diya</button>
+    <div id="msg" role="alert"></div>
+  </form>
+  <div id="done">
+    <div class="diya">🪔</div>
+    <h1>Your diya is lit!</h1>
+    <p>Look at the big screen. Shubh Deepavali!</p>
+    <button id="again" type="button">Light another</button>
+  </div>
+</main>
+<script>
+  const $ = id => document.getElementById(id);
+  let busy = false;
+
+  async function post(payload) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 8000);
+    try {
+      return await fetch('/wish', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload), signal: ctl.signal });
+    } finally { clearTimeout(timer); }
+  }
+
+  $('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (busy) return;
+    const payload = { name: $('name').value.trim(), text: $('text').value.trim() };
+    if (!payload.name) { $('name').focus(); return; }
+    busy = true; $('btn').disabled = true; $('btn').textContent = 'Lighting…'; $('msg').textContent = '';
+
+    let ok = false, fatal = false;
+    for (let attempt = 0; attempt < 3 && !ok && !fatal; attempt++) {
+      try {
+        const r = await post(payload);
+        if (r.ok) ok = true;
+        else if (r.status >= 400 && r.status < 500) fatal = true;
+      } catch (err) { /* network hiccup: retry */ }
+      if (!ok && !fatal) await new Promise(r => setTimeout(r, 800));
+    }
+
+    if (ok) {
+      $('form').style.display = 'none'; $('done').style.display = 'block';
+    } else {
+      $('msg').textContent = fatal ? 'Please enter your name and try again.'
+        : 'Could not reach the screen. Check you are on the office Wi-Fi, then tap the button again.';
+    }
+    busy = false; $('btn').disabled = false; $('btn').textContent = 'Light my diya';
+  });
+
+  $('again').addEventListener('click', () => {
+    $('name').value = ''; $('text').value = '';
+    $('done').style.display = 'none'; $('form').style.display = 'block';
+    $('name').focus();
+  });
+</script>
+</body>
+</html>
