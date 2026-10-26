@@ -78,7 +78,7 @@
       $('form').style.display = 'none'; $('done').style.display = 'block';
     } else {
       $('msg').textContent = fatal ? 'Please enter your name and try again.'
-        : 'Could not reach the screen. Check you are on the office Wi-Fi, then tap the button again.';
+        : 'Could not reach the screen. Check your internet connection, then tap the button again.';
     }
     busy = false; $('btn').disabled = false; $('btn').textContent = 'Light my diya';
   });

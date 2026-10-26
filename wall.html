@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Diya Wall</title>
+<title>ABN AMRO Diwali 2026 · Diya Wall</title>
 <style>
   /* Branding: teal #009488, yellow #F9BD20 (ABN AMRO). The official ABN AMRO typeface is proprietary, so a clean system sans is used. */
   html, body { margin: 0; height: 100%; overflow: hidden; background: radial-gradient(circle at 50% 100%, #0c5a53, #021815 74%);
@@ -14,6 +14,7 @@
   h1 { margin: 0; font-size: clamp(1.8rem, 4.6vw, 3.8rem); line-height: 1.2; font-weight: 700; color: #F9BD20;
        text-shadow: 0 0 22px rgba(249,189,32,.55), 0 0 55px rgba(255,120,0,.4); }
   h1 .brand { color: #fff; background: #009488; padding: .02em .32em; border-radius: .18em; margin-right: .2em; text-shadow: none; letter-spacing: .02em; }
+  #sub { color: #fff; font-size: clamp(1.1rem, 2.4vw, 2rem); font-weight: 600; letter-spacing: .28em; text-transform: uppercase; margin-top: 2px; opacity: .95; }
   #count { color: #8fe3da; font-size: clamp(1rem, 1.9vw, 1.5rem); margin-top: 4px; }
   #latest { height: 2.7em; margin: 8px auto 0; max-width: 80vw; font-size: clamp(1rem, 2vw, 1.7rem); line-height: 1.3;
             color: #fff; overflow: hidden; opacity: 0; transition: opacity .6s; }
@@ -48,7 +49,8 @@
 <body>
 <canvas id="fx"></canvas>
 <div id="head">
-  <h1><span class="brand">ABN AMRO</span>Diwali Diya Wall 🪔</h1>
+  <h1><span class="brand">ABN AMRO</span>Diwali 2026 🪔</h1>
+  <div id="sub">Diya Wall</div>
   <div id="count"></div>
   <div id="latest"></div>
 </div>
@@ -56,7 +58,7 @@
   <div class="t">Scan to light your diya</div>
   <canvas id="qr"></canvas>
   <div class="u" id="url"></div>
-  <div class="s">Join the office Wi-Fi first</div>
+  <div class="s">Works on any Wi-Fi or mobile data</div>
 </div>
 <div id="wall"></div>
 <div id="status">● connecting…</div>
@@ -208,7 +210,7 @@ function showProblem() { // page was opened as a plain file / by a static server
   box.classList.add('problem');
   box.querySelector('.t').textContent = 'Not connected to the Diya Wall server';
   $('url').textContent = 'In a terminal run:  node server.js   then open  http://localhost:3000/wall';
-  box.querySelector('.s').textContent = 'Do not open wall.html directly or with Live Server';
+  box.querySelector('.s').textContent = 'Open the wall through the server address, not as a file';
   try { if (es) es.close(); } catch (e) { /* ignore */ }
   clearTimeout(badTimer); badTimer = null;
   statusEl.className = 'bad'; statusEl.textContent = '● server not found';
