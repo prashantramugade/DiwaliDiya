@@ -16,8 +16,9 @@
   h1 .brand { color: #fff; background: #009488; padding: .02em .32em; border-radius: .18em; margin-right: .2em; text-shadow: none; letter-spacing: .02em; }
   #sub { color: #fff; font-size: clamp(1.1rem, 2.4vw, 2rem); font-weight: 600; letter-spacing: .28em; text-transform: uppercase; margin-top: 2px; opacity: .95; }
   #count { color: #8fe3da; font-size: clamp(1rem, 1.9vw, 1.5rem); margin-top: 4px; }
-  #latest { height: 2.7em; margin: 8px auto 0; max-width: 80vw; font-size: clamp(1rem, 2vw, 1.7rem); line-height: 1.3;
-            color: #fff; overflow: hidden; opacity: 0; transition: opacity .6s; }
+  #latest { height: 4.1em; margin: 8px auto 0; max-width: 80vw; font-size: clamp(1rem, 2vw, 1.7rem); line-height: 1.3;
+            color: #fff; overflow: hidden; opacity: 0; transition: opacity .4s; }
+  #latest .more { font-size: .6em; color: #8fe3da; margin-top: 4px; letter-spacing: .04em; }
 
   #qrbox { position: fixed; z-index: 6; background: #fff; color: #06312d; border-radius: 18px; padding: 16px; box-sizing: border-box;
            text-align: center; box-shadow: 0 0 0 6px #009488, 0 0 60px rgba(249,189,32,.55);
@@ -42,6 +43,37 @@
   @keyframes flick { 0% { transform: scale(1, 1) rotate(-3deg); } 100% { transform: scale(.88, 1.12) rotate(3deg); } }
   @keyframes ignite { 0% { opacity: 0; transform: scale(.3); filter: brightness(3); } 60% { opacity: 1; transform: scale(1.15); } 100% { transform: none; filter: none; } }
 
+  /* Admin: "Clear wall" pill (top right). It hides together with the mouse cursor, so it never shows on the projector. */
+  #adminBtn { position: fixed; top: 14px; right: 16px; z-index: 8; display: inline-flex; align-items: center; gap: 8px;
+              padding: 9px 16px 9px 13px; border-radius: 999px; font: 600 14px/1 'Segoe UI', Helvetica, Arial, sans-serif; letter-spacing: .02em;
+              color: #e6f7f5; background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.22); cursor: pointer;
+              -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: 0 4px 18px rgba(0,0,0,.35);
+              transition: opacity .35s ease, background .2s ease, border-color .2s ease, color .2s ease, transform .2s ease; }
+  #adminBtn svg { width: 17px; height: 17px; flex: none; }
+  #adminBtn:hover, #adminBtn:focus-visible { background: rgba(217,48,37,.88); border-color: rgba(255,255,255,.55); color: #fff; transform: translateY(-1px); outline: none; }
+  body.nocursor #adminBtn { opacity: 0; pointer-events: none; }
+  @media (pointer: coarse) { body.nocursor #adminBtn { opacity: .6; pointer-events: auto; } }
+  @media (max-width: 720px) { #adminBtn span { display: none; } #adminBtn { padding: 10px; } }
+
+  #modal { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; padding: 16px;
+           background: rgba(1,12,10,.72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  #modal.open { display: flex; }
+  #modal .card { width: min(100%, 400px); background: #fff; color: #06312d; border-radius: 20px; padding: 26px 24px 22px; text-align: center;
+                 box-shadow: 0 0 0 5px #009488, 0 24px 80px rgba(0,0,0,.55); font-family: 'Segoe UI', Helvetica, Arial, sans-serif; animation: pop .22s ease-out; }
+  #modal h2 { margin: 6px 0 6px; font-size: 1.35rem; }
+  #modal p { margin: 0 0 14px; color: #3d5f5b; font-size: .98rem; }
+  #modal .ico { width: 54px; height: 54px; margin: 0 auto; border-radius: 50%; background: #fde8e6; color: #d93025; display: flex; align-items: center; justify-content: center; }
+  #modal .ico svg { width: 28px; height: 28px; }
+  #modal input { width: 100%; box-sizing: border-box; padding: 13px 14px; border-radius: 12px; border: 1.5px solid #b8d4d0; font-size: 16px; text-align: center; color: #06312d; background: #f6fbfa; }
+  #modal input:focus { outline: none; border-color: #009488; box-shadow: 0 0 0 3px rgba(0,148,136,.2); }
+  #modal .row { display: flex; gap: 10px; margin-top: 14px; }
+  #modal button { flex: 1; padding: 13px 10px; border-radius: 12px; border: 0; font: 700 1rem 'Segoe UI', Helvetica, Arial, sans-serif; cursor: pointer; }
+  #modal .cancel { background: #e8f1f0; color: #06312d; }
+  #modal .go { background: #d93025; color: #fff; }
+  #modal button:disabled { opacity: .6; cursor: default; }
+  #mmsg { min-height: 1.3em; margin-top: 10px; font-size: .92rem; color: #d93025; }
+  @keyframes pop { from { transform: scale(.94); opacity: 0; } to { transform: none; opacity: 1; } }
+
   #status { position: fixed; left: 10px; bottom: 8px; z-index: 7; font: 12px system-ui, sans-serif; color: #ffffff88; pointer-events: none; }
   #status.bad { color: #ff6b6b; font-size: 16px; font-weight: 700; }
 </style>
@@ -61,6 +93,20 @@
   <div class="s">Works on any Wi-Fi or mobile data</div>
 </div>
 <div id="wall"></div>
+<button id="adminBtn" type="button" aria-label="Clear wall" title="Clear wall (Shift+R)">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+  <span>Clear wall</span>
+</button>
+<div id="modal" role="dialog" aria-modal="true" aria-labelledby="mtitle">
+  <div class="card">
+    <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></div>
+    <h2 id="mtitle">Clear the wall?</h2>
+    <p id="mcount">All diyas will be removed for everyone.</p>
+    <input id="mkey" type="password" placeholder="Admin key" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <div id="mmsg" role="alert"></div>
+    <div class="row"><button id="mcancel" class="cancel" type="button">Cancel</button><button id="mgo" class="go" type="button">Clear all diyas</button></div>
+  </div>
+</div>
 <div id="status">● connecting…</div>
 
 <script>
@@ -276,7 +322,37 @@ function layout() {
   });
 }
 
-let total = 0, hideTimer;
+let total = 0;
+
+// Wishes are shown one after another (nobody's wish is skipped). Names without a wish get a short mention,
+// dropped when many are waiting. When the queue is long, each wish is shown a little shorter.
+const bannerQ = []; let bannerBusy = false;
+function enqueueBanner(w) {
+  if (!w.text && bannerQ.length >= 6) return;
+  if (bannerQ.length >= 60) return;
+  bannerQ.push(w);
+  if (!bannerBusy) nextBanner(); else updateMore();
+}
+function updateMore() { // keep the "N more wishes coming up" line current while a wish is on screen
+  let more = latest.querySelector('.more');
+  const n = bannerQ.filter(x => x.text).length;
+  if (!n) { if (more) more.remove(); return; }
+  if (!more) { more = document.createElement('div'); more.className = 'more'; latest.appendChild(more); }
+  more.textContent = n + (n === 1 ? ' more wish' : ' more wishes') + ' coming up';
+}
+function nextBanner() {
+  const w = bannerQ.shift();
+  if (!w) { bannerBusy = false; latest.style.opacity = 0; return; }
+  bannerBusy = true;
+  latest.replaceChildren();
+  const main = document.createElement('div');
+  main.textContent = w.text ? '“' + w.text + '” — ' + w.name : w.name + ' lit a diya 🪔';
+  latest.appendChild(main);
+  updateMore();
+  latest.style.opacity = 1;
+  const ms = w.text ? (bannerQ.length > 4 ? 3500 : 6000) : 2000;
+  setTimeout(() => { latest.style.opacity = 0; setTimeout(nextBanner, 450); }, ms);
+}
 function updateCount() {
   countEl.textContent = total === 0 ? 'Scan the QR code and light your diya'
     : total + (total === 1 ? ' diya lit' : ' diyas lit') + ' · scan to add yours';
@@ -293,8 +369,7 @@ function addDiya(w, fresh) {
   if (fresh) {
     rockets.push({ x0: a.cx + (Math.random() - .5) * 60, tx: a.cx, ty: a.cy, t0: performance.now(), dur: 600, px: 0, py: H,
                    done: () => burst(a.cx, a.cy, 50) });
-    latest.textContent = w.text ? '“' + w.text + '” — ' + w.name : w.name + ' lit a diya 🪔';
-    latest.style.opacity = 1; clearTimeout(hideTimer); hideTimer = setTimeout(() => { latest.style.opacity = 0; }, 8000);
+    enqueueBanner(w);
   }
 }
 setInterval(() => { // slow dimming of old diyas
@@ -373,15 +448,39 @@ setInterval(() => { if (Date.now() - lastMsg > 35000) { lastMsg = Date.now(); co
 const NAMES = ['Asha', 'Rahul', 'Priya', 'Vikram', 'Meera', 'Jan', 'Sanne', 'Arjun', 'Lotte', 'Kiran'];
 const WISHES = ['Health and happiness', 'Fewer flaky tests', 'Peace and light', 'A bug-free release', 'Good food, good friends', ''];
 const pick = a => a[Math.floor(Math.random() * a.length)];
+// ---------- clear wall (needs the admin key, the same one the /admin page uses) ----------
+const modal = $('modal'), mkey = $('mkey'), mmsg = $('mmsg'), mgo = $('mgo');
+function openClear() {
+  let k = ''; try { k = sessionStorage.getItem('dk') || ''; } catch (e) { /* ignore */ }
+  mkey.value = k; mmsg.textContent = ''; mgo.disabled = false; mgo.textContent = 'Clear all diyas';
+  $('mcount').textContent = total === 0 ? 'The wall is already empty.' : 'All ' + total + (total === 1 ? ' diya' : ' diyas') + ' will be removed for everyone.';
+  modal.classList.add('open'); setTimeout(() => mkey.focus(), 30);
+}
+function closeClear() { modal.classList.remove('open'); mkey.value = ''; mkey.blur(); }
+async function doClear() {
+  const k = mkey.value.trim(); if (!k) { mmsg.textContent = 'Enter the admin key.'; mkey.focus(); return; }
+  mgo.disabled = true; mgo.textContent = 'Clearing…'; mmsg.textContent = '';
+  const r = await fetch('/admin/clear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: k }) }).catch(() => null);
+  if (r && r.ok) { try { sessionStorage.setItem('dk', k); } catch (e) { /* ignore */ } closeClear(); return; }
+  try { sessionStorage.removeItem('dk'); } catch (e) { /* ignore */ }
+  mmsg.textContent = !r ? 'Could not reach the server.' : r.status === 429 ? 'Too many tries. Wait a minute.' : 'Wrong admin key.';
+  mgo.disabled = false; mgo.textContent = 'Clear all diyas'; mkey.select();
+}
+$('adminBtn').addEventListener('click', openClear);
+$('mcancel').addEventListener('click', closeClear);
+mgo.addEventListener('click', doClear);
+modal.addEventListener('click', e => { if (e.target === modal) closeClear(); });
+mkey.addEventListener('keydown', e => { if (e.key === 'Enter') doClear(); });
 function toggleFs() { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}); }
 addEventListener('keydown', e => {
+  if (modal.classList.contains('open')) { if (e.key === 'Escape') closeClear(); return; } // typing the key must not trigger shortcuts
   const k = e.key.toLowerCase();
   if (k === 'f') toggleFs();
   else if (k === 't') fetch('/wish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: pick(NAMES), text: pick(WISHES) }) }).catch(() => {});
   else if (k === 'n') nextAddr();
-  else if (e.key === 'R' && e.shiftKey && confirm('Clear all diyas from the wall?')) fetch('/admin/clear', { method: 'POST' }).catch(() => {});
+  else if (e.key === 'R' && e.shiftKey) openClear();
 });
-addEventListener('dblclick', toggleFs);
+addEventListener('dblclick', e => { if (!e.target.closest('#modal, #adminBtn')) toggleFs(); });
 let cursorTimer; const hideCursor = () => document.body.classList.add('nocursor');
 addEventListener('mousemove', () => { document.body.classList.remove('nocursor'); clearTimeout(cursorTimer); cursorTimer = setTimeout(hideCursor, 3000); });
 cursorTimer = setTimeout(hideCursor, 5000);
