@@ -6,6 +6,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 
 const args = Object.fromEntries(process.argv.slice(2).map(a => {
   const m = a.match(/^--([^=]+)(?:=(.*))?$/);
@@ -13,6 +14,13 @@ const args = Object.fromEntries(process.argv.slice(2).map(a => {
 }));
 const PORT = Number(args.port || process.env.PORT || 3000);
 const FORCE_IP = String(args.ip || process.env.HOST_IP || '');
+// PIN for the wall and admin. Set it with the WALL_PIN environment variable (or --pin=1234).
+// It is never stored in the code (the repo is public). If unset, a random PIN is made and printed at start.
+let PIN = String(args.pin === true ? '' : (args.pin || process.env.WALL_PIN || '')).trim();
+let PIN_GENERATED = false;
+if (!PIN) { PIN = String(crypto.randomInt(0, 10000)).padStart(4, '0'); PIN_GENERATED = true; }
+const AUTH_KEY = crypto.createHash('sha256').update('diya-wall:' + PIN).digest();
+const TOKEN = crypto.createHmac('sha256', AUTH_KEY).update('wall-ok-v1').digest('hex');
 const DATA_FILE = path.join(__dirname, 'wishes.json');
 const MAX_WISHES = 2000;
 
@@ -96,7 +104,99 @@ function broadcast(obj) {
 }
 setInterval(() => broadcast({ ping: 1 }), 15000); // keeps connections alive through proxies/Wi-Fi
 
+// ---------- PIN gate ----------
+const safeEq = (a, b) => {
+  const x = Buffer.from(String(a)), y = Buffer.from(String(b));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+};
+function authed(req) {
+  const m = /(?:^|;\s*)dw=([0-9a-f]+)/.exec(req.headers.cookie || '');
+  return !!m && safeEq(m[1], TOKEN);
+}
+function clientIp(req) { // behind Render's proxy the last X-Forwarded-For entry is the one the proxy added
+  const xf = String(req.headers['x-forwarded-for'] || '').split(',').map(s => s.trim()).filter(Boolean);
+  return xf.length ? xf[xf.length - 1] : req.socket.remoteAddress;
+}
+const fails = new Map();           // ip -> { n, until }
+let gFails = [], gLockUntil = 0;   // global brute-force cap
+function lockLeft(ip) {
+  const now = Date.now();
+  if (now < gLockUntil) return gLockUntil - now;
+  const f = fails.get(ip);
+  return f && f.until > now ? f.until - now : 0;
+}
+function noteFail(ip) {
+  const now = Date.now();
+  const f = fails.get(ip) || { n: 0, until: 0 };
+  if (f.until && f.until <= now) { f.n = 0; f.until = 0; }
+  if (++f.n >= 5) f.until = now + 15 * 60e3;
+  fails.set(ip, f);
+  gFails = gFails.filter(t => now - t < 10 * 60e3); gFails.push(now);
+  if (gFails.length >= 60) { gLockUntil = now + 5 * 60e3; gFails = []; }
+  if (fails.size > 2000) for (const [k, v] of fails) if (v.until < now) fails.delete(k);
+}
+function handlePin(req, res) {
+  let body = '';
+  req.on('data', d => { body += d; if (body.length > 200) req.destroy(); });
+  req.on('end', () => {
+    const ip = clientIp(req);
+    const left = lockLeft(ip);
+    if (left > 0) return send(res, 429, 'application/json', JSON.stringify({ wait: Math.ceil(left / 60000) }));
+    let pin = '';
+    try { pin = String(JSON.parse(body).pin || ''); } catch (e) { /* ignore */ }
+    if (safeEq(pin, PIN)) {
+      fails.delete(ip);
+      const secure = String(req.headers['x-forwarded-proto'] || '').includes('https') ? '; Secure' : '';
+      res.writeHead(200, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store',
+        'Set-Cookie': `dw=${TOKEN}; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200${secure}` });
+      return res.end('ok');
+    }
+    noteFail(ip);
+    const l2 = lockLeft(ip);
+    if (l2 > 0) return send(res, 429, 'application/json', JSON.stringify({ wait: Math.ceil(l2 / 60000) }));
+    send(res, 403, 'text/plain', 'wrong');
+  });
+}
+const PIN_HTML = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark">
+<title>ABN AMRO Diwali 2026</title><style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:16px;
+background:radial-gradient(circle at 50% 100%,#0c5a53,#021815 74%);color:#F9BD20;font-family:'Segoe UI','Helvetica Neue',Helvetica,Arial,sans-serif;text-align:center}
+main{width:min(100%,320px)}
+.brand{display:inline-block;background:#009488;color:#fff;font-weight:700;padding:.15em .6em;border-radius:.3em;letter-spacing:.02em}
+.d{font-size:3rem;margin:.1em 0}h1{font-size:1.4rem;margin:.1em 0 .2em}p{margin:0 0 14px;color:#d6f3ef}
+.dots{display:flex;justify-content:center;gap:14px;margin:6px 0 10px}
+.dots i{width:16px;height:16px;border-radius:50%;border:2px solid #F9BD20;transition:.12s}.dots i.on{background:#F9BD20;box-shadow:0 0 10px #F9BD20}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pad button{padding:15px 0;font-size:1.4rem;font-weight:700;border:1px solid #F9BD2055;border-radius:14px;background:#ffffff12;color:#fff;font-family:inherit}
+.pad button:active{background:#009488}.pad .x{visibility:hidden}
+#msg{min-height:1.5em;margin-top:12px;color:#ff9b9b}
+.shake{animation:sh .35s}@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+</style></head><body><main>
+<div class="brand">ABN AMRO</div><div class="d">🪔</div><h1>Diwali 2026</h1><p>Enter PIN to open the wall</p>
+<div class="dots" id="dots"><i></i><i></i><i></i><i></i></div>
+<div class="pad" id="pad"></div><div id="msg" role="alert"></div></main><script>
+const $=i=>document.getElementById(i);let v='',busy=false;
+const keys=['1','2','3','4','5','6','7','8','9','x','0','⌫'];
+keys.forEach(k=>{const b=document.createElement('button');b.type='button';b.textContent=k==='x'?'':k;
+ if(k==='x')b.className='x';else b.onclick=()=>press(k);$('pad').appendChild(b)});
+function draw(){[...$('dots').children].forEach((d,i)=>d.className=i<v.length?'on':'')}
+function press(k){if(busy)return;$('msg').textContent='';
+ if(k==='⌫')v=v.slice(0,-1);else if(v.length<4)v+=k;draw();if(v.length===4)go()}
+document.addEventListener('keydown',e=>{if(/^[0-9]$/.test(e.key))press(e.key);else if(e.key==='Backspace')press('⌫')});
+async function go(){busy=true;
+ try{const r=await fetch('/pin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:v})});
+  if(r.ok){location.reload();return}
+  if(r.status===429){const j=await r.json();$('msg').textContent='Too many tries. Wait '+j.wait+' min.'}
+  else $('msg').textContent='Wrong PIN';
+  $('dots').classList.remove('shake');void $('dots').offsetWidth;$('dots').classList.add('shake')}
+ catch(e){$('msg').textContent='Cannot reach the server'}
+ v='';draw();busy=false}
+</script></body></html>`;
+
 const PAGES = { '/': 'join.html', '/join': 'join.html', '/wall': 'wall.html', '/wall/': 'wall.html' };
+const DENY = res => send(res, 401, 'text/plain', 'PIN required');
 
 const server = http.createServer((req, res) => {
   req.on('error', () => {});
@@ -104,7 +204,10 @@ const server = http.createServer((req, res) => {
   const url = req.url.split('?')[0];
 
   try {
+    if (url === '/pin' && req.method === 'POST') return handlePin(req, res);
+
     if (url === '/events') {
+      if (!authed(req)) return DENY(res);
       req.socket.setTimeout(0);
       req.socket.setNoDelay(true);
       res.writeHead(200, {
@@ -142,9 +245,12 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    if (url === '/admin' && req.method === 'GET') return send(res, 200, 'text/html; charset=utf-8', ADMIN_HTML);
+    if (url === '/admin' && req.method === 'GET') {
+      return send(res, 200, 'text/html; charset=utf-8', authed(req) ? ADMIN_HTML : PIN_HTML);
+    }
 
     if (url === '/admin/clear' && req.method === 'POST') {
+      if (!authed(req)) { req.resume(); return DENY(res); }
       req.resume();
       wishes = []; seq = 0; epoch = Date.now(); recent.clear(); save();
       broadcast({ init: [], epoch });
@@ -152,14 +258,16 @@ const server = http.createServer((req, res) => {
     }
 
     if (url === '/info') {
+      if (!authed(req)) return DENY(res);
       const list = addresses().map(ip => `http://${ip}:${PORT}/`);
       return send(res, 200, 'application/json', JSON.stringify({ candidates: list, join: list[0], count: wishes.length }));
     }
-    if (url === '/health') return send(res, 200, 'text/plain', 'ok ' + wishes.length);
+    if (url === '/health') return authed(req) ? send(res, 200, 'text/plain', 'ok ' + wishes.length) : DENY(res);
     if (url === '/favicon.ico') { res.writeHead(204); return res.end(); }
 
     const file = PAGES[url];
     if (!file) return send(res, 404, 'text/plain', 'Not found');
+    if (file === 'wall.html' && !authed(req)) return send(res, 200, 'text/html; charset=utf-8', PIN_HTML);
     fs.readFile(path.join(__dirname, file), (err, data) => {
       if (err) return send(res, 500, 'text/plain', 'Missing ' + file + ' next to server.js');
       send(res, 200, 'text/html; charset=utf-8', data);
@@ -187,6 +295,7 @@ process.on('SIGINT', () => { save(); process.exit(0); });
 server.listen(PORT, '0.0.0.0', () => {
   const ips = addresses();
   console.log('\n🪔  Diya Wall is running');
+  console.log(PIN_GENERATED ? `   PIN (random, none was set): ${PIN}   (set your own with WALL_PIN or --pin=)` : '   PIN protection: on');
   console.log(`   Big screen : http://localhost:${PORT}/wall   (press F for fullscreen)`);
   console.log(`   Guests join: http://${ips[0]}:${PORT}/   (the QR code on the wall points here)`);
   if (ips.length > 1) {

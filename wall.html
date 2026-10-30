@@ -463,7 +463,7 @@ function connect() {
   try { if (es) es.close(); } catch (e) { /* ignore */ }
   es = new EventSource('/events');
   es.onopen = () => setStatus(true);
-  es.onerror = () => setStatus(false);
+  es.onerror = () => { setStatus(false); checkAuth(); };
   es.onmessage = e => {
     lastMsg = Date.now(); setStatus(true);
     let m; try { m = JSON.parse(e.data); } catch (err) { return; }
@@ -471,6 +471,7 @@ function connect() {
     else if (m.wish && !seen.has(m.wish.id)) { seen.add(m.wish.id); total++; addDiya(m.wish, true); }
   };
 }
+function checkAuth() { fetch('/health').then(r => { if (r.status === 401) location.reload(); }).catch(() => {}); }
 setInterval(() => { if (Date.now() - lastMsg > 35000) { lastMsg = Date.now(); connect(); } }, 5000); // watchdog
 
 // ---------- keys & housekeeping ----------
