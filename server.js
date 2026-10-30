@@ -16,7 +16,7 @@ const PORT = Number(args.port || process.env.PORT || 3000);
 const FORCE_IP = String(args.ip || process.env.HOST_IP || '');
 // PIN for the wall and admin. Set it with the WALL_PIN environment variable (or --pin=1234).
 // It is never stored in the code (the repo is public). If unset, a random PIN is made and printed at start.
-let PIN = String(args.pin === true ? '' : (args.pin || process.env.WALL_PIN || '')).trim();
+let PIN = String(args.pin === true ? '' : (args.pin || process.env.WALL_PIN || '')).trim().replace(/^["']|["']$/g, '').trim();
 let PIN_GENERATED = false;
 if (!PIN) { PIN = String(crypto.randomInt(0, 10000)).padStart(4, '0'); PIN_GENERATED = true; }
 const AUTH_KEY = crypto.createHash('sha256').update('diya-wall:' + PIN).digest();
@@ -158,9 +158,10 @@ function handlePin(req, res) {
   });
 }
 const PIN_HTML = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><meta name="color-scheme" content="dark">
 <title>ABN AMRO Diwali 2026</title><style>
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+html,body{overflow:hidden;overscroll-behavior:none}
 body{margin:0;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:16px;
 background:radial-gradient(circle at 50% 100%,#0c5a53,#021815 74%);color:#F9BD20;font-family:'Segoe UI','Helvetica Neue',Helvetica,Arial,sans-serif;text-align:center}
 main{width:min(100%,320px)}
@@ -295,7 +296,7 @@ process.on('SIGINT', () => { save(); process.exit(0); });
 server.listen(PORT, '0.0.0.0', () => {
   const ips = addresses();
   console.log('\n🪔  Diya Wall is running');
-  console.log(PIN_GENERATED ? `   PIN (random, none was set): ${PIN}   (set your own with WALL_PIN or --pin=)` : '   PIN protection: on');
+  console.log(PIN_GENERATED ? `   PIN (random, none was set): ${PIN}   (set your own with WALL_PIN or --pin=)` : `   PIN protection: on (${PIN.length} characters, from ${args.pin ? '--pin' : 'WALL_PIN'})`);
   console.log(`   Big screen : http://localhost:${PORT}/wall   (press F for fullscreen)`);
   console.log(`   Guests join: http://${ips[0]}:${PORT}/   (the QR code on the wall points here)`);
   if (ips.length > 1) {
