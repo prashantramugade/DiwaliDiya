@@ -142,7 +142,7 @@ function authed(req) {
   const m = /(?:^|;\s*)dw=([0-9a-f]+)/.exec(req.headers.cookie || '');
   return !!m && safeEq(m[1], TOKEN);
 }
-function clientIp(req) { // behind Render's proxy the last X-Forwarded-For entry is the one the proxy added
+function clientIp(req) { // behind a reverse proxy the last X-Forwarded-For entry is the one the proxy added
   const xf = String(req.headers['x-forwarded-for'] || '').split(',').map(s => s.trim()).filter(Boolean);
   return xf.length ? xf[xf.length - 1] : req.socket.remoteAddress;
 }
