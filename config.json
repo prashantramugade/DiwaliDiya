@@ -1,0 +1,11 @@
+{
+  "company": "Your Company",
+  "event": "Diwali 2026",
+  "primaryColor": "#009488",
+  "accentColor": "#F9BD20",
+  "joinTitle": "Light a Diya",
+  "joinIntro": "Add your name and, if you like, a wish. Your diya appears on the big screen.",
+  "wishPlaceholder": "Your wish for the year (optional)",
+  "thanks": "Look at the big screen. Shubh Deepavali!",
+  "scanText": "Scan to light your diya"
+}

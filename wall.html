@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ABN AMRO Diwali 2026 · Diya Wall</title>
+<title>{{company}} {{event}} · Diya Wall</title>
 <style>
-  /* Branding: teal #009488, yellow #F9BD20 (ABN AMRO). The official ABN AMRO typeface is proprietary, so a clean system sans is used. */
+  /* Branding: set in config.json (the server swaps the two brand colours and fills the {{placeholders}}). */
   html, body { margin: 0; height: 100%; overflow: hidden; background: radial-gradient(circle at 50% 100%, #0c5a53, #021815 74%);
                font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #F9BD20; }
   body.nocursor { cursor: none; }
@@ -97,13 +97,13 @@
 <body>
 <canvas id="fx"></canvas>
 <div id="head">
-  <h1><span class="brand">ABN AMRO</span>Diwali 2026 🪔</h1>
+  <h1><span class="brand">{{company}}</span>{{event}} 🪔</h1>
   <div id="sub">Diya Wall</div>
   <div id="count"></div>
   <div id="latest"></div>
 </div>
 <div id="qrbox">
-  <div class="t">Scan to light your diya</div>
+  <div class="t">{{scanText}}</div>
   <canvas id="qr"></canvas>
   <div class="u" id="url"></div>
   <div class="s">Works on any Wi-Fi or mobile data</div>

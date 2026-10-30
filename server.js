@@ -104,6 +104,35 @@ function broadcast(obj) {
 }
 setInterval(() => broadcast({ ping: 1 }), 15000); // keeps connections alive through proxies/Wi-Fi
 
+// ---------- branding / text (edit config.json, or point CONFIG_FILE at your own) ----------
+const DEFAULT_CONFIG = {
+  company: 'Your Company', event: 'Diwali 2026', primaryColor: '#009488', accentColor: '#F9BD20',
+  joinTitle: 'Light a Diya', joinIntro: 'Add your name and, if you like, a wish. Your diya appears on the big screen.',
+  wishPlaceholder: 'Your wish for the year (optional)', thanks: 'Look at the big screen. Shubh Deepavali!',
+  scanText: 'Scan to light your diya'
+};
+let CONFIG = { ...DEFAULT_CONFIG };
+try {
+  const f = process.env.CONFIG_FILE || path.join(__dirname, 'config.json');
+  if (fs.existsSync(f)) {
+    const j = JSON.parse(fs.readFileSync(f, 'utf8'));
+    for (const k of Object.keys(DEFAULT_CONFIG)) if (typeof j[k] === 'string' && j[k].trim()) CONFIG[k] = j[k].trim().slice(0, 200);
+  }
+} catch (e) { console.warn('Could not read config.json, using defaults:', e.message); }
+const hexOk = c => /^#[0-9a-f]{6}$/i.test(c);
+if (!hexOk(CONFIG.primaryColor)) CONFIG.primaryColor = DEFAULT_CONFIG.primaryColor;
+if (!hexOk(CONFIG.accentColor)) CONFIG.accentColor = DEFAULT_CONFIG.accentColor;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).join(',');
+// Fills {{placeholders}} in the pages and swaps the two brand colours.
+function render(html) {
+  let out = String(html);
+  for (const k of Object.keys(DEFAULT_CONFIG)) out = out.split('{{' + k + '}}').join(esc(CONFIG[k]));
+  return out
+    .replace(/#009488/gi, CONFIG.primaryColor).replace(/#F9BD20/gi, CONFIG.accentColor)
+    .replace(/\b0,\s?148,\s?136\b/g, rgb(CONFIG.primaryColor)).replace(/\b249,\s?189,\s?32\b/g, rgb(CONFIG.accentColor));
+}
+
 // ---------- PIN gate ----------
 const safeEq = (a, b) => {
   const x = Buffer.from(String(a)), y = Buffer.from(String(b));
@@ -159,7 +188,7 @@ function handlePin(req, res) {
 }
 const PIN_HTML = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><meta name="color-scheme" content="dark">
-<title>ABN AMRO Diwali 2026</title><style>
+<title>{{company}} {{event}}</title><style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation;-webkit-user-select:none;user-select:none}
 html,body{overflow:hidden;overscroll-behavior:none}
 body{margin:0;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:16px;
@@ -175,7 +204,7 @@ main{width:min(100%,320px)}
 #msg{min-height:1.5em;margin-top:12px;color:#ff9b9b}
 .shake{animation:sh .35s}@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
 </style></head><body><main>
-<div class="brand">ABN AMRO</div><div class="d">🪔</div><h1>Diwali 2026</h1><p>Enter PIN to open the wall</p>
+<div class="brand">{{company}}</div><div class="d">🪔</div><h1>{{event}}</h1><p>Enter PIN to open the wall</p>
 <div class="dots" id="dots"><i></i><i></i><i></i><i></i></div>
 <div class="pad" id="pad"></div><div id="msg" role="alert"></div></main><script>
 const $=i=>document.getElementById(i);let v='',busy=false;
@@ -195,6 +224,7 @@ async function go(){busy=true;
  catch(e){$('msg').textContent='Cannot reach the server'}
  v='';draw();busy=false}
 </script></body></html>`;
+const PIN_PAGE = render(PIN_HTML);
 
 const PAGES = { '/': 'join.html', '/join': 'join.html', '/wall': 'wall.html', '/wall/': 'wall.html' };
 const DENY = res => send(res, 401, 'text/plain', 'PIN required');
@@ -247,7 +277,7 @@ const server = http.createServer((req, res) => {
     }
 
     if (url === '/admin' && req.method === 'GET') {
-      return send(res, 200, 'text/html; charset=utf-8', authed(req) ? ADMIN_HTML : PIN_HTML);
+      return send(res, 200, 'text/html; charset=utf-8', authed(req) ? ADMIN_HTML : PIN_PAGE);
     }
 
     if (url === '/admin/clear' && req.method === 'POST') {
@@ -268,10 +298,10 @@ const server = http.createServer((req, res) => {
 
     const file = PAGES[url];
     if (!file) return send(res, 404, 'text/plain', 'Not found');
-    if (file === 'wall.html' && !authed(req)) return send(res, 200, 'text/html; charset=utf-8', PIN_HTML);
+    if (file === 'wall.html' && !authed(req)) return send(res, 200, 'text/html; charset=utf-8', PIN_PAGE);
     fs.readFile(path.join(__dirname, file), (err, data) => {
       if (err) return send(res, 500, 'text/plain', 'Missing ' + file + ' next to server.js');
-      send(res, 200, 'text/html; charset=utf-8', data);
+      send(res, 200, 'text/html; charset=utf-8', render(data));
     });
   } catch (e) {
     try { send(res, 500, 'text/plain', 'error'); } catch (_) { /* ignore */ }

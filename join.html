@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
-<title>Light a Diya</title>
+<title>{{joinTitle}}</title>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; min-height: 100vh; min-height: 100dvh; background: radial-gradient(circle at 50% 0%, #0c5a53, #021815 72%); color: #F9BD20;
@@ -28,19 +28,19 @@
 <body>
 <main>
   <form id="form" autocomplete="off">
-    <div class="brand">ABN AMRO</div>
+    <div class="brand">{{company}}</div>
     <div class="diya">🪔</div>
-    <h1>Light a Diya</h1>
-    <p>Add your name and, if you like, a wish. Your diya appears on the big screen.</p>
+    <h1>{{joinTitle}}</h1>
+    <p>{{joinIntro}}</p>
     <input id="name" placeholder="Your name" maxlength="24" required autocapitalize="words" enterkeyhint="next">
-    <textarea id="text" placeholder="Your wish for the year (optional)" maxlength="120" rows="3"></textarea>
+    <textarea id="text" placeholder="{{wishPlaceholder}}" maxlength="120" rows="3"></textarea>
     <button id="btn" type="submit">Light my diya</button>
     <div id="msg" role="alert"></div>
   </form>
   <div id="done">
     <div class="diya">🪔</div>
     <h1>Your diya is lit!</h1>
-    <p>Look at the big screen. Shubh Deepavali!</p>
+    <p>{{thanks}}</p>
     <button id="again" type="button">Light another</button>
   </div>
 </main>
